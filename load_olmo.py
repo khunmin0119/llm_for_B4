@@ -1,11 +1,27 @@
-# this file is made for load olom(made in ai2) in huggingface transformers
-from transformers import AutoModelForCausalLM, AutoTokenizer
-olmo = AutoModelForCausalLM.from_pretrained("allenai/Olmo-3-7B-Think")
-tokenizer = AutoTokenizer.from_pretrained("allenai/Olmo-3-7B-Think")
-message = ["Who would win in a fight - a dinosaur or a cow named Moo Moo?"]
-inputs = tokenizer(message, return_tensors='pt', return_token_type_ids=False)
-# optional verifying cuda
-# inputs = {k: v.to('cuda') for k,v in inputs.items()}
-# olmo = olmo.to('cuda')
-response = olmo.generate(**inputs, max_new_tokens=100, do_sample=True, top_k=50, top_p=0.95)
-print(tokenizer.batch_decode(response, skip_special_tokens=True)[0])
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+model_id = "allenai/Olmo-3-7B-Think"
+device = "cuda:0"
+
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    device_map=0,                 # ✅ 모델 전체를 GPU 0에
+    torch_dtype=torch.float16,    # 보통 VRAM 절약/속도에 유리 (가능하면)
+)
+model.eval()
+
+prompt = "간단히 자기소개 해줘."
+inputs = tokenizer(prompt, return_tensors="pt").to(device)  # ✅ 입력도 GPU로
+
+with torch.inference_mode():
+    outputs = model.generate(
+        **inputs,
+        temperature=0.6,
+        top_p=0.95,
+        max_new_tokens=256,
+    )
+
+print(tokenizer.decode(outputs[0], skip_special_tokens=True))
